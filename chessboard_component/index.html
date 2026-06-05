@@ -56,51 +56,41 @@
 </head>
 <body>
     <div id="board-container"></div>
+    
+    <!-- Load the official Streamlit Component library served by the parent window -->
+    <script src="./streamlit-component-lib.js"></script>
+    
     <script>
-        // Notify Streamlit that the component is ready
-        window.parent.postMessage({
-            isStreamlitMessage: true,
-            type: "streamlit:componentReady",
-            apiVersion: 1
-        }, "*");
-
         // Listen for board updates from Streamlit
-        window.addEventListener("message", (event) => {
-            const data = event.data;
-            if (data.type === "streamlit:render") {
-                const args = data.args;
-                if (args && args.html) {
-                    const container = document.getElementById("board-container");
-                    container.innerHTML = args.html;
+        Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, (event) => {
+            const args = event.detail.args;
+            if (args && args.html) {
+                const container = document.getElementById("board-container");
+                container.innerHTML = args.html;
 
-                    // Attach event listeners dynamically to avoid CSP inline script blocking
-                    const cells = container.querySelectorAll(".chess-cell");
-                    cells.forEach(cell => {
-                        cell.addEventListener("click", () => {
-                            const sqAttr = cell.getAttribute("data-sq");
-                            if (sqAttr !== null) {
-                                const sq = parseInt(sqAttr, 10);
-                                if (!isNaN(sq)) {
-                                    window.parent.postMessage({
-                                        isStreamlitMessage: true,
-                                        type: "streamlit:setComponentValue",
-                                        value: { sq: sq, timestamp: Date.now() }
-                                    }, "*");
-                                }
+                // Attach event listeners dynamically to avoid CSP inline script blocking
+                const cells = container.querySelectorAll(".chess-cell");
+                cells.forEach(cell => {
+                    cell.addEventListener("click", () => {
+                        const sqAttr = cell.getAttribute("data-sq");
+                        if (sqAttr !== null) {
+                            const sq = parseInt(sqAttr, 10);
+                            if (!isNaN(sq)) {
+                                // Use the official Streamlit setComponentValue API
+                                Streamlit.setComponentValue({ sq: sq, timestamp: Date.now() });
                             }
-                        });
+                        }
                     });
-                }
-                
-                // Adjust iframe height to avoid scrolling or clipping
-                const bodyHeight = document.body.scrollHeight;
-                window.parent.postMessage({
-                    isStreamlitMessage: true,
-                    type: "streamlit:setFrameHeight",
-                    height: bodyHeight
-                }, "*");
+                });
             }
+            
+            // Adjust iframe height to avoid scrolling or clipping
+            const bodyHeight = document.body.scrollHeight;
+            Streamlit.setFrameHeight(bodyHeight);
         });
+
+        // Notify Streamlit that the component is ready
+        Streamlit.setComponentReady();
     </script>
 </body>
 </html>
