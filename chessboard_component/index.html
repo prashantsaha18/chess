@@ -64,22 +64,32 @@
             apiVersion: 1
         }, "*");
 
-        // Function called when a chess cell is clicked
-        window.handleClick = (sq) => {
-            window.parent.postMessage({
-                isStreamlitMessage: true,
-                type: "streamlit:setComponentValue",
-                value: sq
-            }, "*");
-        };
-
         // Listen for board updates from Streamlit
         window.addEventListener("message", (event) => {
             const data = event.data;
             if (data.type === "streamlit:render") {
                 const args = data.args;
                 if (args && args.html) {
-                    document.getElementById("board-container").innerHTML = args.html;
+                    const container = document.getElementById("board-container");
+                    container.innerHTML = args.html;
+
+                    // Attach event listeners dynamically to avoid CSP inline script blocking
+                    const cells = container.querySelectorAll(".chess-cell");
+                    cells.forEach(cell => {
+                        cell.addEventListener("click", () => {
+                            const sqAttr = cell.getAttribute("data-sq");
+                            if (sqAttr !== null) {
+                                const sq = parseInt(sqAttr, 10);
+                                if (!isNaN(sq)) {
+                                    window.parent.postMessage({
+                                        isStreamlitMessage: true,
+                                        type: "streamlit:setComponentValue",
+                                        value: { sq: sq, timestamp: Date.now() }
+                                    }, "*");
+                                }
+                            }
+                        });
+                    });
                 }
                 
                 // Adjust iframe height to avoid scrolling or clipping

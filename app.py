@@ -3,9 +3,12 @@ import chess
 import time
 import random
 from chess_engine import ChessAI, get_ai, evaluate_board
+import os
 import streamlit.components.v1 as components
 
-chessboard_component = components.declare_component("chessboard_component", path="./chessboard_component")
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+build_dir = os.path.join(parent_dir, "chessboard_component")
+chessboard_component = components.declare_component("chessboard_component", path=build_dir)
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -196,7 +199,7 @@ def render_board_html(board, flip=False):
             if piece and piece.piece_type==chess.KING and board.is_check() and piece.color==board.turn:
                 bg = "#cc3c3c" if is_light else "#a02828"
             sym = PIECE_SYMBOLS.get((piece.piece_type,piece.color),'') if piece else ''
-            html += f'<div class="chess-cell {extra}" style="background:{bg};" onclick="handleClick({sq})">{sym}</div>'
+            html += f'<div class="chess-cell {extra}" style="background:{bg};" data-sq="{sq}">{sym}</div>'
     html += '<div class="rank-lbl"></div>'
     for f in files:
         html += f'<div class="file-lbl">{FILE_NAMES[f]}</div>'
@@ -577,7 +580,7 @@ if st.session_state.game_mode == "online":
         # Board
         flip = (my_color == chess.BLACK)
         board_html = render_board_html(board, flip=flip)
-        clicked_sq = chessboard_component(html=board_html, key=f"online_board_{gid}")
+        clicked_sq = chessboard_component(html=board_html, key=f"online_board_{gid}", height=510)
         
         if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over and game_data["status"]=="active":
             click_time = clicked_sq.get("timestamp")
@@ -741,7 +744,7 @@ with col_board:
                     st.rerun()
 
     flip = st.session_state.flip_board or (mode not in ("two_player","online") and st.session_state.player_color==chess.BLACK)
-    clicked_sq = chessboard_component(html=render_board_html(board, flip=flip), key="local_board")
+    clicked_sq = chessboard_component(html=render_board_html(board, flip=flip), key="local_board", height=510)
     
     if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over:
         click_time = clicked_sq.get("timestamp")
