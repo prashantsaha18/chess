@@ -97,6 +97,7 @@ DEFAULTS = {
     "online_game_id": None, "chat_input": "", "last_online_fen": None,
     "online_color": None,
     "last_click_timestamp": 0,
+    "last_clicked_val": -1,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -113,6 +114,30 @@ PIECE_SYMBOLS = {
 }
 FILE_NAMES = 'abcdefgh'
 RANK_NAMES = '12345678'
+
+def get_clicked_square(clicked_sq):
+    if clicked_sq is None:
+        return None
+    if isinstance(clicked_sq, dict):
+        click_time = clicked_sq.get("timestamp")
+        if click_time != st.session_state.get("last_click_timestamp"):
+            st.session_state.last_click_timestamp = click_time
+            return clicked_sq.get("sq")
+        return None
+    if isinstance(clicked_sq, int):
+        if clicked_sq != st.session_state.get("last_clicked_val"):
+            st.session_state.last_clicked_val = clicked_sq
+            return clicked_sq
+        return None
+    if isinstance(clicked_sq, str):
+        try:
+            val = int(clicked_sq)
+            if val != st.session_state.get("last_clicked_val"):
+                st.session_state.last_clicked_val = val
+                return val
+        except ValueError:
+            pass
+    return None
 
 def get_legal_dests(board, from_sq):
     return {m.to_square for m in board.legal_moves if m.from_square == from_sq}
@@ -582,40 +607,37 @@ if st.session_state.game_mode == "online":
         board_html = render_board_html(board, flip=flip)
         clicked_sq = chessboard_component(html=board_html, key=f"online_board_{gid}", height=510)
         
-        if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over and game_data["status"]=="active":
-            click_time = clicked_sq.get("timestamp")
-            if click_time != st.session_state.get("last_click_timestamp"):
-                st.session_state.last_click_timestamp = click_time
-                clicked = clicked_sq.get("sq")
-                is_my_turn = board.turn == my_color
-                if is_my_turn and not st.session_state.promotion_pending:
-                    sel = st.session_state.selected_square
-                    if sel is None:
-                        p = board.piece_at(clicked)
-                        if p and p.color == board.turn:
-                            st.session_state.selected_square = clicked
-                    else:
-                        dests = get_legal_dests(board, sel)
-                        if clicked in dests:
-                            mv = chess.Move(sel, clicked)
-                            if needs_promotion(board, mv):
-                                st.session_state.promotion_pending = mv
-                                st.session_state.selected_square = None
-                            else:
-                                legal = [m for m in board.legal_moves if m.from_square==sel and m.to_square==clicked]
-                                if legal:
-                                    san = do_move(board, legal[0])
-                                    is_over = board.is_game_over()
-                                    result = board.result() if is_over else None
-                                    push_online_move(gid, san, board.fen(), is_over, result)
-                                    if is_over:
-                                        st.session_state.game_over = True
+        clicked = get_clicked_square(clicked_sq)
+        if clicked is not None and not st.session_state.game_over and game_data["status"]=="active":
+            is_my_turn = board.turn == my_color
+            if is_my_turn and not st.session_state.promotion_pending:
+                sel = st.session_state.selected_square
+                if sel is None:
+                    p = board.piece_at(clicked)
+                    if p and p.color == board.turn:
+                        st.session_state.selected_square = clicked
+                else:
+                    dests = get_legal_dests(board, sel)
+                    if clicked in dests:
+                        mv = chess.Move(sel, clicked)
+                        if needs_promotion(board, mv):
+                            st.session_state.promotion_pending = mv
                             st.session_state.selected_square = None
-                        elif board.piece_at(clicked) and board.piece_at(clicked).color==board.turn:
-                            st.session_state.selected_square = clicked
                         else:
-                            st.session_state.selected_square = None
-                st.rerun()
+                            legal = [m for m in board.legal_moves if m.from_square==sel and m.to_square==clicked]
+                            if legal:
+                                san = do_move(board, legal[0])
+                                is_over = board.is_game_over()
+                                result = board.result() if is_over else None
+                                push_online_move(gid, san, board.fen(), is_over, result)
+                                if is_over:
+                                    st.session_state.game_over = True
+                        st.session_state.selected_square = None
+                    elif board.piece_at(clicked) and board.piece_at(clicked).color==board.turn:
+                        st.session_state.selected_square = clicked
+                    else:
+                        st.session_state.selected_square = None
+            st.rerun()
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:10px;margin-top:.4rem;"><span style="font-size:1.4rem;">{bottom_sym}</span><strong style="color:#c9a84c;">{bottom_name}</strong><span class="elo-badge">{bottom_elo}</span><span class="badge-green badge" style="font-size:.65rem;">YOU</span></div>', unsafe_allow_html=True)
 
@@ -746,35 +768,32 @@ with col_board:
     flip = st.session_state.flip_board or (mode not in ("two_player","online") and st.session_state.player_color==chess.BLACK)
     clicked_sq = chessboard_component(html=render_board_html(board, flip=flip), key="local_board", height=510)
     
-    if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over:
-        click_time = clicked_sq.get("timestamp")
-        if click_time != st.session_state.get("last_click_timestamp"):
-            st.session_state.last_click_timestamp = click_time
-            clicked = clicked_sq.get("sq")
-            if not st.session_state.promotion_pending:
-                is_my = (mode=="two_player" or board.turn==st.session_state.player_color)
-                sel = st.session_state.selected_square
-                if is_my:
-                    if sel is None:
-                        p = board.piece_at(clicked)
-                        if p and p.color==board.turn:
-                            st.session_state.selected_square = clicked
-                    else:
-                        dests = get_legal_dests(board, sel)
-                        if clicked in dests:
-                            mv = chess.Move(sel, clicked)
-                            if needs_promotion(board, mv):
-                                st.session_state.promotion_pending = mv
-                            else:
-                                legal = [m for m in board.legal_moves if m.from_square==sel and m.to_square==clicked]
-                                if legal: do_move(board, legal[0])
-                            st.session_state.selected_square = None
-                            if board.is_game_over(): st.session_state.game_over = True
-                        elif board.piece_at(clicked) and board.piece_at(clicked).color==board.turn:
-                            st.session_state.selected_square = clicked
+    clicked = get_clicked_square(clicked_sq)
+    if clicked is not None and not st.session_state.game_over:
+        if not st.session_state.promotion_pending:
+            is_my = (mode=="two_player" or board.turn==st.session_state.player_color)
+            sel = st.session_state.selected_square
+            if is_my:
+                if sel is None:
+                    p = board.piece_at(clicked)
+                    if p and p.color==board.turn:
+                        st.session_state.selected_square = clicked
+                else:
+                    dests = get_legal_dests(board, sel)
+                    if clicked in dests:
+                        mv = chess.Move(sel, clicked)
+                        if needs_promotion(board, mv):
+                            st.session_state.promotion_pending = mv
                         else:
-                            st.session_state.selected_square = None
-            st.rerun()
+                            legal = [m for m in board.legal_moves if m.from_square==sel and m.to_square==clicked]
+                            if legal: do_move(board, legal[0])
+                        st.session_state.selected_square = None
+                        if board.is_game_over(): st.session_state.game_over = True
+                    elif board.piece_at(clicked) and board.piece_at(clicked).color==board.turn:
+                        st.session_state.selected_square = clicked
+                    else:
+                        st.session_state.selected_square = None
+        st.rerun()
 
     if st.session_state.game_over:
         res = board.result()
