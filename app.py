@@ -579,7 +579,7 @@ if st.session_state.game_mode == "online":
         board_html = render_board_html(board, flip=flip)
         clicked_sq = chessboard_component(html=board_html, key=f"online_board_{gid}")
         
-        if clicked_sq is not None and not st.session_state.game_over and game_data["status"]=="active":
+        if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over and game_data["status"]=="active":
             click_time = clicked_sq.get("timestamp")
             if click_time != st.session_state.get("last_click_timestamp"):
                 st.session_state.last_click_timestamp = click_time
@@ -743,7 +743,7 @@ with col_board:
     flip = st.session_state.flip_board or (mode not in ("two_player","online") and st.session_state.player_color==chess.BLACK)
     clicked_sq = chessboard_component(html=render_board_html(board, flip=flip), key="local_board")
     
-    if clicked_sq is not None and not st.session_state.game_over:
+    if clicked_sq is not None and isinstance(clicked_sq, dict) and not st.session_state.game_over:
         click_time = clicked_sq.get("timestamp")
         if click_time != st.session_state.get("last_click_timestamp"):
             st.session_state.last_click_timestamp = click_time
